@@ -31,7 +31,8 @@ if (!require(pacman)) {install.packages("pacman")} # Package management
 pacman::p_load(tidyverse,                          # To manipulate data
                haven,                              # To read sav, as_factor
                rstudioapi,                         # For file directory
-               psych)                              # For describe
+               psych,                              # For describe
+               ggVennDiagram)                      # For ggVennDiagram
 
 # Set working directory to this file location
 # Ensure dataset in same directory
@@ -61,7 +62,9 @@ hse_labels <- sapply(hse_data,
                      NA  # No label
                    }
                  )
-names_labels_df <- data.frame(Variable = hse_names, Label = hse_labels, stringsAsFactors = FALSE)
+names_labels_df <- data.frame(Variable = hse_names,
+                              Label = hse_labels,
+                              stringsAsFactors = FALSE)
 rownames(names_labels_df) <- NULL # Otherwise Variable appears twice.
 print(names_labels_df)
 
@@ -106,9 +109,11 @@ mode_crv <- function(x) {
 # ==> Outcome: 10,617 people are included in the sample.
 # pserial is the "Serial number of Individual"
 # There are no empty rows (NA)
+# There are no duplicates (TRUE means no duplicates)
 # This matches the number of rows in the dataset.
-any(is.na(hse_data$pserial))    # Check for empty rows (NA)
-sum(!is.na(hse_data$pserial))   # Number of not empty rows
+any(is.na(hse_data$pserial))       # Check for empty rows (NA)
+all(!duplicated(hse_data$pserial)) # Check for duplicates
+sum(!is.na(hse_data$pserial))      # Number of not empty rows
 
 # b: What is the percentage of people who drink alcohol? (dnnow)
 # ==> Outcome: 78.65% of people who responded yes or no drink alcohol.
@@ -120,7 +125,38 @@ sum(!is.na(hse_data$pserial))   # Number of not empty rows
 # Percentage Yes = (6712 / (6712 + 1822)) * 100
 sum(is.na(hse_data$dnnow))                              # Number empty rows (NA)
 table(as_factor(hse_data$dnnow))                        # Frequency table
-table(as_factor(hse_data$dnnow)) %>% prop.table() * 100 # Percentage
+dnnow_pct_tab <- table(as_factor(hse_data$dnnow)) %>%
+  prop.table() * 100                                    # Percentage
+dnnow_pct_tab
+
+# Prep for pie chart
+dnnow_pct_df <- dnnow_pct_tab %>%
+  as.data.frame() %>%                        # Convert to data frame
+  rename(name = Var1, percentage = Freq) %>% # Rename columns
+  filter(percentage > 0)                     # Remove 0 values
+dnnow_pct_df
+
+# Y-axis label for pie chart
+pct_yes <- dnnow_pct_df$percentage[1]     # Percentage people who drink
+dnnow_responded <- sum(table(as_factor(hse_data$dnnow))) # Total responded
+dnnow_y_label <- paste0(round(pct_yes, 1), "% of ",
+                        dnnow_responded, " responents drink nowadays")
+
+# Pie chart
+dnnow_pct_df %>%
+  ggplot(aes(x = "", y = percentage, fill = factor(name))) +
+  geom_bar(stat = "identity", width = 1, color = "black") +
+  coord_polar(theta = "y", start = 0) +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")),
+            position = position_stack(vjust = 0.5)) +
+  theme_bw() +
+  theme(axis.text = element_blank(),
+        panel.grid = element_blank()) +
+  scale_fill_brewer(palette = "Blues", direction = -1) +
+  labs(title = "Alcohol Consumption",
+       x = NULL,
+       y = dnnow_y_label,
+       fill = "Drink nowadays")
 
 # c: What is the percentage of women in the sample? (Sex)
 # ==> Outcome: 54.30% of the sample are women.
@@ -136,14 +172,49 @@ table(as_factor(hse_data$Sex)) %>% prop.table() * 100   # Percentage
 # d: What is the highest educational level? (topqual3)
 # ==> Outcome: The highest educational level is NVQ4/NVQ5/Degree or equiv (1)
 # topqual3 is "Highest educational level"
-# NVQ4/NVQ5/Degree or equiv (1)
-# Higher ed below degree (2)
-# NVQ3/GCE A Level equiv (3)
-# NVQ2/GCE O Level equiv (4)
-# NVQ1/CSE other grade equiv (5)
-# Foreign/other (6)
-# No qualification (7)
-attr(hse_data$topqual3, "labels") # Labels
+# NVQ4/NVQ5/Degree or equiv (1) = 2008 people
+# Higher ed below degree (2) = 948 people
+# NVQ3/GCE A Level equiv (3) = 1248 people
+# NVQ2/GCE O Level equiv (4) = 1803 people
+# NVQ1/CSE other grade equiv (5) = 395 people
+# Foreign/other (6) = 127 people
+# No qualification (7) = 2037 people
+# Number of empty rows (NA) ==> 2051
+attr(hse_data$topqual3, "labels")   # Labels
+sum(is.na(hse_data$topqual3))       # Number empty rows (NA)
+table(as_factor(hse_data$topqual3)) # Frequency table
+topqual_pct_tab <- table(as_factor(hse_data$topqual3)) %>%
+  prop.table() * 100                # Percentage
+topqual_pct_tab
+
+# Prep for pie chart
+topqual_pct_df <- topqual_pct_tab %>%
+  as.data.frame() %>%                        # Convert to data frame
+  rename(name = Var1, percentage = Freq) %>% # Rename columns
+  filter(percentage > 0)                     # Remove 0 values
+topqual_pct_df
+
+# Y-axis label for pie chart
+pct_highest <- topqual_pct_df$percentage[1] # Percentage highest ed
+topqual_responded <- sum(table(as_factor(hse_data$topqual3))) # Total responded
+topqual_y_label <- paste0(round(pct_highest, 1), "% of ",
+                  topqual_responded, " have NVQ4/NVQ/Degree/Equiv")
+
+# Pie chart
+topqual_pct_df %>%
+  ggplot(aes(x = "", y = percentage, fill = factor(name))) +
+  geom_bar(stat = "identity", width = 1, color = "black") +
+  coord_polar(theta = "y", start = 0) +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")),
+            position = position_stack(vjust = 0.5)) +
+  theme_bw() +
+  theme(axis.text = element_blank(),
+        panel.grid = element_blank()) +
+  scale_fill_brewer(palette = "Blues", direction = -1) +
+  labs(title = "Educational level",
+       x = NULL,
+       y = topqual_y_label,
+       fill = "Educational level")
 
 # e: What is percentage of divorced and separated people? (marstatc)
 # ==> Outcome: 9.50 % of the sample are divorced and separated.
@@ -155,13 +226,113 @@ attr(hse_data$topqual3, "labels") # Labels
 # Divorced (5)
 # Widowed (6)
 # Cohabitees (7)
+# Number of empty rows (NA) ==> 2009
 attr(hse_data$marstatc, "labels") # Labels
 sum(is.na(hse_data$marstatc))                              # NA
 table(as_factor(hse_data$marstatc))                        # Frequency table
-table(as_factor(hse_data$marstatc)) %>% prop.table() * 100 # Percentage
+mar_pct_tab <- table(as_factor(hse_data$marstatc)) %>%
+  prop.table() * 100                                       # Percentage
+mar_pct_tab
 div_sep <- sum(hse_data$marstatc == 4 | hse_data$marstatc == 5, na.rm = TRUE)
 div_sep                                                    # Total div and sep
-div_sep / sum(table(as_factor(hse_data$marstatc))) * 100   # Percentage
+pct_div_sep <- div_sep / sum(table(as_factor(hse_data$marstatc))) * 100 # Pct
+
+# Prep for pie chart
+mar_pct_df <- mar_pct_tab %>%
+  as.data.frame() %>%                        # Convert to data frame
+  rename(name = Var1, percentage = Freq) %>% # Rename columns
+  filter(percentage > 0)                     # Remove 0 values
+mar_pct_df
+
+# Y-axis label for pie chart
+mar_responded <- sum(table(as_factor(hse_data$marstatc))) # Total responded
+mar_y_label <- paste0(round(pct_div_sep, 1), "% of ",
+                      mar_responded, " are divorced or separated")
+
+# Pie chart
+mar_pct_df %>%
+  ggplot(aes(x = "", y = percentage, fill = factor(name))) +
+  geom_bar(stat = "identity", width = 1, color = "black") +
+  coord_polar(theta = "y", start = 0) +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")),
+            position = position_stack(vjust = 0.5)) +
+  theme_bw() +
+  theme(axis.text = element_blank(),
+        panel.grid = element_blank()) +
+  scale_fill_brewer(palette = "Blues", direction = -1) +
+  labs(title = "Maritial status including cohabitees",
+       x = NULL,
+       y = mar_y_label,
+       fill = "Marital status")
+
+# Try a Venn Diagram of dnnow = Yes (1), # topqual3 = NVQ4/NVQ5/Degree or equiv (1)
+# and marstatc = Divirced (5) or Separated (4)
+# Do one for Sex = Female (2)
+# Do one for Sex = Male (1)
+
+# Create vectors for Venn Diagram
+dnnow_yes_serials <- hse_data$pserial[hse_data$dnnow == 1]
+dnnow_no_serials <- hse_data$pserial[hse_data$dnnow == 2]
+female_serials <- hse_data$pserial[hse_data$Sex == 2]
+male_serials <- hse_data$pserial[hse_data$Sex == 1] 
+topqual_serials <- hse_data$pserial[hse_data$topqual3 == 1]
+div_sep_serials <- hse_data$pserial[hse_data$marstatc %in% c(4, 5)]
+serials_drink_female <- list("Drink" = dnnow_yes_serials,
+                             "Female" = female_serials)
+serials_drink_male <- list("Drink" = dnnow_yes_serials,
+                            "Male" = male_serials)
+serials_drink_mf <- list("Drink" = dnnow_yes_serials, 
+                         "Female" = female_serials,
+                         "Male" = male_serials)
+serials_nodrink_mf <- list ("No Drink" = dnnow_no_serials, 
+                            "Female" = female_serials,
+                            "Male" = male_serials)                           
+serials_list_female <- list("Drink" = dnnow_yes_serials,
+                            "Female" = female_serials,
+                            "Top Qualification" = topqual_serials,
+                            "Div/Sep" = div_sep_serials)
+serials_list_male <- list("Drink" = dnnow_yes_serials,
+                          "Male" = male_serials,
+                          "Top Qualification" = topqual_serials,
+                          "Div/Sep" = div_sep_serials)
+
+# Venn for male and female drinkers
+vmfd <- ggVennDiagram(serials_drink_mf,
+                     label_alpha = 0) +
+  ggplot2::scale_fill_gradient(low = "#EFF3FF", high = "#4292c6") + 
+  ggtitle("Venn Diagram: Males and females who drink ")
+vmfd + scale_x_continuous(expand = expansion(mult = .2)) # Show long labels
+
+# Venn for male and female non-drinkers
+vmfnd <- ggVennDiagram(serials_nodrink_mf,
+                      label_alpha = 0) +
+  ggplot2::scale_fill_gradient(low = "#EFF3FF", high = "#4292c6") + 
+  ggtitle("Venn Diagram: Males and females who do not drink ")
+vmfnd + scale_x_continuous(expand = expansion(mult = .2)) # Show long labels
+
+# Venn for females
+vfd <- ggVennDiagram(serials_drink_female,
+                     label_alpha = 0) +
+  ggplot2::scale_fill_gradient(low = "#EFF3FF", high = "#4292c6") + 
+  ggtitle("Venn Diagram: Females who drink ")
+vfd + scale_x_continuous(expand = expansion(mult = .2)) # Show long labels
+
+ggVennDiagram(serials_list_female,
+              label_alpha = 0) +
+  ggplot2::scale_fill_gradient(low = "#EFF3FF", high = "#4292c6") + 
+  ggtitle("Venn Diagram for Females")
+
+# Venn for males
+vmd <- ggVennDiagram(serials_drink_male,
+                     label_alpha = 0) +
+  ggplot2::scale_fill_gradient(low = "#EFF3FF", high = "#4292c6") + 
+  ggtitle("Venn Diagram: Males who drink")
+vmd + scale_x_continuous(expand = expansion(mult = .2)) # Show long labels
+
+ggVennDiagram(serials_list_male,
+              label_alpha = 0) +
+  ggplot2::scale_fill_gradient(low = "#EFF3FF", high = "#4292c6") +
+  ggtitle("Venn Diagram for Males")
 
 # f: Find the mean, median, mode, minimum, maximum, range and standard deviation
 #    of household size, BMI and age at last birthday (HHSize, bmival, Age)
