@@ -1,3 +1,4 @@
+##############################################################################
 # Statististical Analysis Assignment
 # Numerical Analysis End of Module Assessment
 # UoEO MSc AI
@@ -16,8 +17,8 @@
 # STEPS
 # STEP 1: SETUP
 # STEP 2: DESCRIPTIVE STATISTICS
-#
-# VERSIONS
+# STEP 3: INFERENTIAL STATISTICS
+##############################################################################
 
 ##############################################################################
 # STEP 1: SETUP
@@ -376,7 +377,7 @@ hse_data %>%
   theme_bw() +
   labs(title = "Household Size Box Plot",
        y = "Size") +
-  scale_x_continuous(breaks = NULL) # Remove x-axis labels  
+  scale_x_continuous(breaks = NULL) # Remove x-axis labels
 
 # Plot frequency table
 hse_data %>% 
@@ -484,7 +485,14 @@ hse_data %>%
 # dnnow: Whether drink nowadays: Yes (1), No (2): categorical
 # Sex: Sex: Male (1), Female (2): categorical
 # Both categorical so don't need to check for normality
-# ==> Outcome: There is a significant
+# ==> Outcome:
+# Chi-squared independence test
+# H0: Gender and drinks now are independent
+# Ha: Gender and drinks now are not independent
+# p-value < 2.2e-16 < 0.05
+# ==> Reject H0.
+# There is a significant difference between genders in drinking habits
+# Women have a higher percentage of drinkers
 ##############################################################################
 
 # Contingency table
@@ -500,7 +508,7 @@ addmargins(sexdr_labels_cont_tab)
 
 # Contingentcy table with labels and percentages
 sexdr_pct_tab <- sexdr_labels_cont_tab %>%
-  prop.table( margin = 2) * 100
+  prop.table(margin = 2) * 100
 sexdr_pct_tab
 addmargins(sexdr_pct_tab) # Add row and column totals
 
@@ -508,7 +516,7 @@ addmargins(sexdr_pct_tab) # Add row and column totals
 sexdr_labels_cont_tab %>%
   chisq.test() # Chi-squared test
 
-# Box plot of percentage men and women who drink
+# Bar chart of percentage men and women who do and do not drink
 sexdr_pct_df <- as.data.frame.table(sexdr_pct_tab)  # Convert to data frame
 colnames(sexdr_pct_df) <- c("Gender", "Drinks_Nowadays", "Percentage") # Rename
 sexdr_pct_df %>%
@@ -521,19 +529,237 @@ sexdr_pct_df %>%
 
 ##############################################################################
 # b.	Run a significance test to find out which region drinks the most alcohol.
+# Variables
+# dnnow: Whether drink nowadays: Yes (1), No (2): categorical
+# gor1: Government Office Region: categorical
+# Number empty gor1 rows (NA) = 0
+# North East (1), North West (2), Yorkshire and the Humber (3),
+# East Midlands (4), West Midlands (5), East of England (6),
+# London (7), South East (8), South West (9)
+# Wales (10), Scotland (11)
+# Frequency table
+#   1    2    3    4    5    6    7    8    9
+# 880 1396 1082  966 1093 1169 1254 1733 1044
+# Both categorical so don't need to check for normality
+# ==> Outcome:
+# Chi-squared independence test
+# H0: Region and drinks now are independent
+# Ha: Region and drinks now are not independent
+# p-value < 2.2e-16 < 0.05
+# ==> Reject H0.
+# There is a significant difference between regions' drinking habits
+# South East has the highest percentage of drinkers
 ##############################################################################
+
+# Understand gor1
+attr(hse_data$gor1, "labels") # 11 Labels
+sum(is.na(hse_data$Age))      # Number empty rows (NA) = 0
+table(hse_data$gor1)          # Frequency table (1st 9 regions used)
+describe(hse_data$gor1)       # Descriptive statistics
+
+# Contingency table (with 9 rows)
+table(hse_data$gor1, hse_data$dnnow)
+
+# Contingency table with labels
+gor_label <- factor(hse_data$gor1, levels = 1:9,
+                    labels = c("North East", "North West",
+                               "Yorkshire and the Humber", "East Midlands",
+                               "West Midlands", "East of England",
+                               "London", "South East", "South West"))
+dnnow_label <- factor(hse_data$dnnow, levels = c(1,2), labels = c("Yes", "No"))
+gordr_labels_cont_tab <- table(gor_label, dnnow_label)
+addmargins(gordr_labels_cont_tab)
+
+# Contingency table with labels and percentages
+gordr_pct_tab <- gordr_labels_cont_tab %>%
+  prop.table(margin = 2) * 100
+addmargins(gordr_pct_tab) # Add row and column totals
+
+# Chi-squared test of yes and no drink by region
+gordr_labels_cont_tab %>%
+  chisq.test() # Chi-squared test
+
+# Bar chart of regions percentages who do and do not drink
+gordr_pct_df <- as.data.frame.table(gordr_pct_tab)  # Convert to data frame
+colnames(gordr_pct_df) <- c("Region", "Drinks_Nowadays", "Percentage") # Rename
+gordr_pct_df %>%
+  ggplot(aes(x = Region, y = Percentage, fill = Drinks_Nowadays)) +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +
+  theme_bw() +
+  scale_fill_brewer(palette = "Blues", direction = -1) +
+  labs(title = "Percentage Regions who Drink Nowadays",
+       x = "Region", y = "Percentage", fill = "Drink Nowadays")
 
 ##############################################################################
 # c.	Investigate whether there is a statistical difference between
 #     men and women on the following variables:
 #     I.	Valid height.
+#
+# Variables
+#
+# Sex: Sex: Male (1), Female (2): categorical
+# Sex descriptive:
+#    vars     n mean  sd median trimmed mad min max range  skew kurtosis se
+# X1    1 10617 1.54 0.5      2    1.54   0   1   2     1 -0.17    -1.97  0
+# mode = 2
+# mean < median = mode => Left skewed (negative)
+#
+# htval: Valid height (cm): continuous random variable
+# Number empty htval rows (NA) = 1971
+# htval summary:
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's
+#   82.4   157.1   165.1   161.8   173.2   202.5    1971
+# htval descriptive:
+#     vars    n   mean    sd median trimmed   mad  min   max range  skew kurtosis  se
+#  X1    1 8646 161.79 18.85  165.1  161.79 12.01 82.4 202.5 120.1 -1.75     3.58 0.2
+# estimated mode = 166.618
+# mean < median < mode => Left skewed (negative)
+#
+# Categorical and continuous so need to check for normality
+# Normality tests for htval with NA removed:
+# Shapiro-Wilk test for normality
+# data:  heights_male$htval
+# W = 0.73755, p-value < 2.2e-16
+# Shapiro-Wilk normality test
+# # data:  heights_female$htval
+# W = 0.75777, p-value < 2.2e-16
+# ==> Eveerything is non-normal
+#
+# ==> Mann-Whitney U test for non-normal data
+# ==> Outcome:
+# 	Wilcoxon rank sum test with continuity correction
+# data:  heights_male$htval and heights_female$htval
+# W = 14713021, p-value < 2.2e-16
+# alternative hypothesis: true location shift is not equal to 0
+# ==> Reject H0
+# There is a significant difference in height due to gender
 ##############################################################################
+
+# Understand Sex
+describe(hse_data$Sex)     # Descriptive statistics
+mode(hse_data$Sex)         # Mode
+
+# Understand htval
+sum(is.na(hse_data$htval)) # Number empty rows (NA) = 1971
+summary(hse_data$htval)    # Summary statistics
+describe(hse_data$htval)   # Descriptive statistics ==> Left skewed (negative)
+# Plot density
+# Creates a single mode, left-skewed plot
+hse_data %>%
+  ggplot(aes(x = htval)) +
+  geom_density(fill = "lightblue", alpha = 0.5) +
+  theme_bw() +
+  labs(title = "Height Density plot",
+       x = "Height",
+       y = "Density")
+mode_crv(hse_data$htval)   # Estimated mode
+
+# Plot htval box plot (check for outliers) => There are many outliers due to age range
+hse_data %>%
+  ggplot(aes(y = htval)) +
+  geom_boxplot(fill = "lightblue", outlier.color = "red", na.rm = TRUE) +
+  theme_bw() +
+  labs(title = "htval Box Plot",
+       y = "Height") +
+  scale_x_continuous(breaks = NULL) # Remove x-axis labels
+
+# Normality tests
+heights_male <- hse_data[hse_data$Sex == 1 & !is.na(hse_data$htval), ] # Remove NA
+heights_female <- hse_data[hse_data$Sex == 2 & !is.na(hse_data$htval), ] # Remove NA  
+
+# Male Q-Q plot =
+heights_male %>%
+  ggplot(aes(sample = htval)) +
+  stat_qq() +
+  theme_bw() +
+  labs(title = "Height Q-Q for males")
+
+# Female Q-Q plot
+heights_female %>%
+  ggplot(aes(sample = htval)) +
+  stat_qq() +
+  theme_bw() +
+  labs(title = "Height Q-Q for females")
+
+# Combined histogram - male and female
+# Male and female data frame
+heights_mf_df <- rbind(
+  heights_male %>% mutate(Sex = "Male"),
+  heights_female %>% mutate(Sex = "Female"))
+
+# Combined histogram
+heights_mf_df %>%
+  ggplot(aes(x = htval, fill = factor(Sex))) +
+  geom_histogram(binwidth = 1, alpha = 0.5, position = "identity") +
+#  geom_density(alpha = 0.5) +
+  theme_bw() +
+  labs(title = "Height Histogram for males and females", 
+       x = "Height (cm)", y = "Count", fill = "Gender") +
+  scale_fill_manual(values = c("Male" = "#4292c6", "Female" = "#C51B7D")) +
+  scale_x_continuous(n.breaks = 10)
+
+# Shapiro-Wilk test for normality
+shapiro.test(heights_male$htval)   # Shapiro-Wilk test
+shapiro.test(heights_female$htval) # Shapiro-Wilk test
+
+# Mann-Whitney U test for non-normal data
+wilcox.test(heights_male$htval, heights_female$htval)
+
+# Box plot Mann-Whitney U test
+heights_mf_df %>%
+  ggplot(aes(x = Sex, y = htval, fill = Sex)) +
+  geom_boxplot(outlier.color = "red", na.rm = TRUE) +
+  theme_bw() +
+  labs(title = "Height Box Plot for Males and Females", 
+        x = "Sex", 
+        y = "Height") +
+  scale_fill_manual(values = c("Male" = "#4292c6", "Female" = "#C51B7D"))
 
 ##############################################################################
 # c.	Investigate whether there is a statistical difference between
 #     men and women on the following variables:
 #     II.	Valid weight.
+#
+# Variables
+#
+# Sex: Sex: Male (1), Female (2): categorical
+# Sex descriptive:
+#    vars     n mean  sd median trimmed mad min max range  skew kurtosis se
+# X1    1 10617 1.54 0.5      2    1.54   0   1   2     1 -0.17    -1.97  0
+# mode = 2
+# mean < median = mode => Left skewed (negative)
+#
+# wtval: Valid weight (Kg) inc. estimated>130kg: continuous random variable
+# Number empty wtval rows (NA) = 
 ##############################################################################
+
+# Understand Sex
+describe(hse_data$Sex)     # Descriptive statistics
+mode(hse_data$Sex)         # Mode
+
+# Understand htval
+sum(is.na(hse_data$wtval)) # Number empty rows (NA) = 1971
+summary(hse_data$wtval)    # Summary statistics
+describe(hse_data$wtval)   # Descriptive statistics ==> Left skewed (negative)
+# Plot density
+# Creates a single mode, left-skewed plot
+hse_data %>%
+  ggplot(aes(x = wtval)) +
+  geom_density(fill = "lightblue", alpha = 0.5) +
+  theme_bw() +
+  labs(title = "Weight Density plot",
+       x = "Weight (kg)",
+       y = "Density")
+mode_crv(hse_data$wtval)   # Estimated mode
+
+# Plot htval box plot (check for outliers) =>
+hse_data %>%
+  ggplot(aes(y = wtval)) +
+  geom_boxplot(fill = "lightblue", outlier.color = "red", na.rm = TRUE) +
+  theme_bw() +
+  labs(title = "wtval Box Plot",
+       y = "Weight (kg)") +
+  scale_x_continuous(breaks = NULL) # Remove x-axis labels
 
 ##############################################################################
 # d.	What is the correlation between whether a person drinks nowadays, total
