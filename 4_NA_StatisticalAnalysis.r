@@ -371,7 +371,7 @@ mode(hse_data$HHSize)       # Mode
 table(hse_data$HHSize)      # Frequency table
 
 # Plot box plot (check for outliers)
-hse_data %>% 
+hse_data %>%
   ggplot(aes(y = HHSize)) +
   geom_boxplot(fill = "lightblue", outlier.color = "red", na.rm = TRUE) +
   theme_bw() +
@@ -380,10 +380,11 @@ hse_data %>%
   scale_x_continuous(breaks = NULL) # Remove x-axis labels
 
 # Plot frequency table
-hse_data %>% 
+hse_data %>%
   mutate(HHSize = as.factor(HHSize)) %>% # Convert to factor for discrete
   ggplot(aes(x = HHSize)) +
   geom_bar(fill = "lightblue") +
+  geom_text(stat = "count", aes(label = ..count..), vjust = -1, size=3) +
   theme_bw() +
   labs(title = "Household Size Frequency Table",
        x = "Size",
@@ -415,13 +416,13 @@ hse_data %>%
   scale_x_continuous(breaks = NULL) # Remove x-axis labels
 
 # mode() function does not work for continuous random variables, need PDF plot
-# Plot density
 # Creates a right-skewed, single mode plot
+# Plot density
 hse_data %>%
   ggplot(aes(x = bmival)) +
   geom_density(fill = "lightblue", alpha = 0.5) +
   theme_bw() +
-  labs(title = "BMI Density plot",
+  labs(title = "BMI Density Plot",
        x = "BMI",
        y = "Density")
 # There is only one mode, so use the density plot to estimate it
@@ -442,9 +443,8 @@ mode_crv(hse_data$bmival)   # Estimated mode
 sum(is.na(hse_data$Age)) # Number empty rows (NA)
 summary(hse_data$Age)    # Summary statistics
 describe(hse_data$Age)   # Descriptive statistics
-mode(hse_data$Age)       # Mode
-
-table(hse_data$Age)      # 2 modes, frequency table confirms
+age_modes <- mode(hse_data$Age)  # Mode
+age_modes
 
 # There are some 0 ages (babies under 12 months), so let's plot outliers
 # No outliers. And frequency table confirms.
@@ -453,14 +453,19 @@ hse_data %>%
   ggplot(aes(y = Age)) +
   geom_boxplot(fill = "lightblue", outlier.color = "red", na.rm = TRUE) +
   theme_bw() +
-  labs(title = "Age Boxplot",
+  labs(title = "Age Box Plot",
        y = "Age") +
   scale_x_continuous(breaks = NULL) # Remove x-axis labels
 
 # Plot histogram
+age_freq <- table(hse_data$Age)  # 2 modes, frequency table confirms
+mode_counts <- age_freq[age_freq == max(age_freq)] # Mode counts
 hse_data %>%
   ggplot(aes(x = Age)) +
   geom_histogram(fill = "lightblue", binwidth = 1) +
+  geom_density(aes(y = ..count..), color = "darkgrey", adjust = 1) +
+  geom_hline(yintercept = mode_counts[1], color = "blue", show.legend = FALSE) +
+  annotate("text", x = 0, y = mode_counts[1], label = mode_counts[1], size = 3) +
   theme_bw() +
   labs(title = "Age Histogram",
        x = "Age",
@@ -690,8 +695,8 @@ heights_mf_df <- rbind(
 # Combined histogram
 heights_mf_df %>%
   ggplot(aes(x = htval, fill = factor(Sex))) +
-  geom_histogram(binwidth = 1, alpha = 0.5, position = "identity") +
-#  geom_density(alpha = 0.5) +
+  geom_histogram(aes(y = ..density..), binwidth = 1, alpha = 0.5, position = "identity") +
+  geom_line(stat = "density", color = "darkgrey") +
   theme_bw() +
   labs(title = "Height Histogram for males and females", 
        x = "Height (cm)", y = "Count", fill = "Gender") +
