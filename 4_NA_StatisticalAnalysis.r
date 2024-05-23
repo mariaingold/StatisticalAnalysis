@@ -33,7 +33,10 @@ pacman::p_load(tidyverse,                          # To manipulate data
                haven,                              # To read sav, as_factor
                rstudioapi,                         # For file directory
                psych,                              # For describe
-               ggVennDiagram)                      # For ggVennDiagram
+               ggVennDiagram,                      # For ggVennDiagram
+               nortest,                            # For Anderson-Darling test
+               vcd)                                # For Cramer v
+
 
 # Set working directory to this file location
 # Ensure dataset in same directory
@@ -508,13 +511,11 @@ sexdr_cont_tab
 sex_label <- factor(hse_data$Sex, levels = c(1,2), labels = c("Male", "Female"))
 dnnow_label <- factor(hse_data$dnnow, levels = c(1,2), labels = c("Yes", "No"))
 sexdr_labels_cont_tab <- table(sex_label, dnnow_label)
-sexdr_labels_cont_tab
 addmargins(sexdr_labels_cont_tab)
 
 # Contingentcy table with labels and percentages
 sexdr_pct_tab <- sexdr_labels_cont_tab %>%
   prop.table(margin = 2) * 100
-sexdr_pct_tab
 addmargins(sexdr_pct_tab) # Add row and column totals
 
 # Chi-squared test of yes and no drink by gender
@@ -527,6 +528,8 @@ colnames(sexdr_pct_df) <- c("Gender", "Drinks_Nowadays", "Percentage") # Rename
 sexdr_pct_df %>%
   ggplot(aes(x = Gender, y = Percentage, fill = Drinks_Nowadays)) +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
+  geom_text(aes(label = paste0(round(Percentage, 1), "%")),
+            position = position_dodge(width = 1), vjust = -0.5, size = 3) +
   theme_bw() +
   scale_fill_brewer(palette = "Blues", direction = -1) +
   labs(title = "Percentage Men and Women who Drink Nowadays",
@@ -590,6 +593,8 @@ colnames(gordr_pct_df) <- c("Region", "Drinks_Nowadays", "Percentage") # Rename
 gordr_pct_df %>%
   ggplot(aes(x = Region, y = Percentage, fill = Drinks_Nowadays)) +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
+  geom_text(aes(label = paste0(round(Percentage, 1), "%")),
+            position = position_dodge(width = 1), vjust = -0.5, size = 3) +
   theme_bw() +
   scale_fill_brewer(palette = "Blues", direction = -1) +
   labs(title = "Percentage Regions who Drink Nowadays",
@@ -628,7 +633,7 @@ gordr_pct_df %>%
 # Shapiro-Wilk normality test
 # # data:  heights_female$htval
 # W = 0.75777, p-value < 2.2e-16
-# ==> Eveerything is non-normal
+# ==> Everything is non-normal
 #
 # ==> Mann-Whitney U test for non-normal data
 # ==> Outcome:
@@ -645,7 +650,6 @@ describe(hse_data$Sex)     # Descriptive statistics
 mode(hse_data$Sex)         # Mode
 
 # Understand htval
-sum(is.na(hse_data$htval)) # Number empty rows (NA) = 1971
 summary(hse_data$htval)    # Summary statistics
 describe(hse_data$htval)   # Descriptive statistics ==> Left skewed (negative)
 # Plot density
@@ -695,8 +699,7 @@ heights_mf_df <- rbind(
 # Combined histogram
 heights_mf_df %>%
   ggplot(aes(x = htval, fill = factor(Sex))) +
-  geom_histogram(aes(y = ..density..), binwidth = 1, alpha = 0.5, position = "identity") +
-  geom_line(stat = "density", color = "darkgrey") +
+  geom_histogram(aes(y = after_stat(count)), binwidth = 1, alpha = 0.5, position = "identity") +
   theme_bw() +
   labs(title = "Height Histogram for males and females", 
        x = "Height (cm)", y = "Count", fill = "Gender") +
@@ -735,17 +738,35 @@ heights_mf_df %>%
 # mean < median = mode => Left skewed (negative)
 #
 # wtval: Valid weight (Kg) inc. estimated>130kg: continuous random variable
-# Number empty wtval rows (NA) = 
+# Number empty wtval rows (NA) = 1876
+#
+# Categorical and continuous so need to check for normality
+# Normality tests for htval with NA and > 130kg removed:
+# Shapiro-Wilk test for normality
+# data:  weights_male$wtval
+# W = 0.93674, p-value < 2.2e-16
+# Shapiro-Wilk normality test
+# # data:  weights_female$wtval
+# W = 0.96551, p-value < 2.2e-16
+# ==> Everything is non-normal
+#
+# ==> Mann-Whitney U test for non-normal data
+# ==> Outcome:
+# 	Wilcoxon rank sum test with continuity correction
+# data:  weights_male$wtval and weights_female$wtval
+# W = 12449400, p-value < 2.2e-16
+# alternative hypothesis: true location shift is not equal to 0
+# ==> Reject H0
+# There is a significant difference in height due to gender
 ##############################################################################
 
 # Understand Sex
 describe(hse_data$Sex)     # Descriptive statistics
 mode(hse_data$Sex)         # Mode
 
-# Understand htval
-sum(is.na(hse_data$wtval)) # Number empty rows (NA) = 1971
+# Understand wtval
 summary(hse_data$wtval)    # Summary statistics
-describe(hse_data$wtval)   # Descriptive statistics ==> Left skewed (negative)
+describe(hse_data$wtval)   # Descriptive statistics 
 # Plot density
 # Creates a single mode, left-skewed plot
 hse_data %>%
@@ -757,7 +778,7 @@ hse_data %>%
        y = "Density")
 mode_crv(hse_data$wtval)   # Estimated mode
 
-# Plot htval box plot (check for outliers) =>
+# Plot wtval box plot (check for outliers) =>
 hse_data %>%
   ggplot(aes(y = wtval)) +
   geom_boxplot(fill = "lightblue", outlier.color = "red", na.rm = TRUE) +
@@ -766,7 +787,156 @@ hse_data %>%
        y = "Weight (kg)") +
   scale_x_continuous(breaks = NULL) # Remove x-axis labels
 
+# Normality tests
+# Remove NA
+weights_male <- hse_data[hse_data$Sex == 1 & !is.na(hse_data$wtval), ]
+weights_female <- hse_data[hse_data$Sex == 2 & !is.na(hse_data$wtval), ]
+
+# Male Q-Q plot =
+weights_male %>%
+  ggplot(aes(sample = wtval)) +
+  stat_qq() +
+  theme_bw() +
+  labs(title = "Weight Q-Q for males")
+
+# Female Q-Q plot
+weights_female %>%
+  ggplot(aes(sample = wtval)) +
+  stat_qq() +
+  theme_bw() +
+  labs(title = "Weight Q-Q for females")
+
+# Combined histogram - male and female
+# Male and female data frame
+weights_mf_df <- rbind(
+  weights_male %>% mutate(Sex = "Male"),
+  weights_female %>% mutate(Sex = "Female"))
+
+# Combined histogram
+weights_mf_df %>%
+  ggplot(aes(x = wtval, fill = factor(Sex))) +
+  geom_histogram(aes(y = after_stat(count)), binwidth = 1, alpha = 0.5, position = "identity") +
+  theme_bw() +
+  labs(title = "Weight Histogram for males and females",
+       x = "Weight (kg)", y = "Count", fill = "Gender") +
+  scale_fill_manual(values = c("Male" = "#4292c6", "Female" = "#C51B7D")) +
+  scale_x_continuous(n.breaks = 10)
+
+# Shapiro-Wilk test for normality
+shapiro.test(weights_male$wtval)   # Shapiro-Wilk test
+shapiro.test(weights_female$wtval) # Shapiro-Wilk test
+
+# Mann-Whitney U test for non-normal data
+wilcox.test(weights_male$wtval, weights_female$wtval)
+
+# Box plot Mann-Whitney U test
+weights_mf_df %>%
+  ggplot(aes(x = Sex, y = wtval, fill = Sex)) +
+  geom_boxplot(outlier.color = "red", na.rm = TRUE) +
+  theme_bw() +
+  labs(title = "Weight Box Plot for Males and Females",
+        x = "Sex", 
+        y = "Weight") +
+  scale_fill_manual(values = c("Male" = "#4292c6", "Female" = "#C51B7D"))
+
 ##############################################################################
 # d.	What is the correlation between whether a person drinks nowadays, total
 #     household income, age at last birthday and gender?
+#
+# Variables
+# dnnow: Whether drink nowadays: Yes (1), No (2): categorical
+# totinc: Total household income: ordinal (1-31): non-normal
+# Age: Age at last birthday: quantitative (0-100): non-normal
+# Sex: Sex: Male (1), Female (2): categorical
+# Compare:
+# dnnow (binary categorical) and totinc (ordinal, non-normal)
+# dnnow (binary categorical) and Age (quantitative, non-normal)
+# dnnow (binary categorical) and Sex (categorical)
+# totinc (ordinal, non-normal) and Age (quantitative, non-normal)
+# totinc (ordinal, non-normal) and Sex (binary categorical)
+# Age (quantitative, non-normal) and Sex (binary categorical)
 ##############################################################################
+
+# Check for normality and type of variables
+
+# dnnow: Previously analysed. categorical. NA = 2083
+# Sex: Previously analysed. categorical. NA = 0
+
+# Age: quantitative
+# Previously analysed. Histogram showed non-normality. NA = 0
+hse_data %>%
+  ggplot(aes(sample = Age)) +
+  stat_qq() +
+  theme_bw() +
+  labs(title = "Age Q-Q")
+# Anderson-Darling (> 5000 samples) test for normality: not normal
+ad.test(hse_data$Age)
+
+# Understand totinc: ordinal
+attr(hse_data$totinc, "labels")
+table(hse_data$totinc)          # Frequency table
+
+# Filter valid income ordinals
+totinc_valid <- hse_data %>% filter(totinc >= 1 & totinc <= 31 & !is.na(totinc))
+
+# Q-Q plot for totinc: not normal
+totinc_valid %>%
+  ggplot(aes(sample = totinc)) +
+  stat_qq() +
+  theme_bw() +
+  labs(title = "Total Household Income Q-Q")
+
+# Histogram for totinc_valid: not normal
+totinc_valid %>%
+  ggplot(aes(x = totinc)) +
+  geom_histogram(fill = "lightblue", binwidth = 1) +
+  theme_bw() +
+  labs(title = "Total Household Income Range Histogram",
+       x = "Income Range", y = "Frequency")
+
+# Anderson-Darling (> 5000 samples) test for normality: not normal
+ad.test(totinc_valid$totinc)
+
+# Teacher requested use any correlation test as the key is interpreting results.
+
+# Correlation tests
+# Data sets need to be same size. cor.test() removes NA
+
+# totinc (ordinal, non-normal) and dnnow (binary categorical)
+cor.test(totinc_valid$totinc, totinc_valid$dnnow, method = "spearman")
+plot(totinc_valid$totinc, totinc_valid$dnnow)
+
+# Age (quantitative, non-normal) and dnnow (binary categorical)
+cor.test(hse_data$Age, hse_data$dnnow, method = "spearman")
+plot(hse_data$Age, hse_data$dnnow)
+
+# Sex (categorical) and dnnow (binary categorical)
+# Cramer's V for two categorical variables
+vcd::assocstats(table(hse_data$Sex, hse_data$dnnow))
+cor.test(hse_data$Sex, hse_data$dnnow, method = "spearman")
+plot(hse_data$Sex, hse_data$dnnow)
+
+# Age (quantitative, non-normal) and totinc (ordinal, non-normal)
+# Spearman's correlation for non-normal ordinal and quantitative
+cor.test(totinc_valid$Age, totinc_valid$totinc, method = "spearman")
+plot(totinc_valid$Age, totinc_valid$totinc)
+# A better plot
+plot_hse_data <- totinc_valid %>%
+  select(Age, totinc) %>%
+  mutate(totinc = as.numeric(as.character(totinc)))
+plot_hse_data %>%
+  ggplot(aes(x = Age, y = totinc)) +
+  geom_point(color = "#1262a6", aes(alpha = totinc)) +
+  scale_alpha_continuous(range = c(0.1, 1)) +
+  theme_bw() +
+  labs(title = "Correlation: Age and Total Household Income",
+       x = "Age", y = "Total Household Income",
+       color = "Age", alpha = "Total Household Income")
+
+# Sex (binary categorical) and totinc (ordinal, non-normal)
+cor.test(totinc_valid$Sex, totinc_valid$totinc, method = "spearman")
+plot(totinc_valid$Sex, totinc_valid$totinc)
+
+# Sex (binary categorical) and Age (quantitative, non-normal)
+cor.test(hse_data$Sex, hse_data$Age, method = "spearman")
+plot(hse_data$Sex, hse_data$Age)
